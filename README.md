@@ -41,9 +41,13 @@ The key idea of CertNet is to decouple hard feasibility from performance learnin
 ├─ demo_acc_.mlx
 │
 ├─ sim_region_compare.pdf
+├─ sim_region_compare.png
 ├─ sim_mpQP.pdf
+├─ sim_mpQP.png
 ├─ sim_CA.pdf
+├─ sim_CA.png
 ├─ sim_ACC.pdf
+├─ sim_ACC.png
 │
 ├─ LICENSE
 └─ README.md
@@ -114,14 +118,40 @@ MOSEK requires a valid license if the scripts call solver-dependent baseline or 
 
 ## Figures
 
-The repository includes the paper-ready PDF figures:
+The repository includes the paper-ready PDF figures and PNG previews for GitHub visualization.
 
-| Figure file | Description |
-|---|---|
-| [`sim_region_compare.pdf`](sim_region_compare.pdf) | PWA critical-region partition vs. certified active validity-region cover |
-| [`sim_mpQP.pdf`](sim_mpQP.pdf) | mpQP benchmark timing and hard-feasibility diagnostics |
-| [`sim_CA.pdf`](sim_CA.pdf) | Control allocation closed-loop trajectories under deadline-limited execution |
-| [`sim_ACC.pdf`](sim_ACC.pdf) | ACC closed-loop speed, input, and safety-margin trajectories |
+| PDF figure | PNG preview | Description |
+|---|---|---|
+| [`sim_region_compare.pdf`](sim_region_compare.pdf) | [`sim_region_compare.png`](sim_region_compare.png) | PWA critical-region partition vs. certified active validity-region cover |
+| [`sim_mpQP.pdf`](sim_mpQP.pdf) | [`sim_mpQP.png`](sim_mpQP.png) | mpQP benchmark timing and hard-feasibility diagnostics |
+| [`sim_CA.pdf`](sim_CA.pdf) | [`sim_CA.png`](sim_CA.png) | Control allocation closed-loop trajectories under deadline-limited execution |
+| [`sim_ACC.pdf`](sim_ACC.pdf) | [`sim_ACC.png`](sim_ACC.png) | ACC closed-loop speed, input, and safety-margin trajectories |
+
+### Figure previews
+
+#### PWA partition vs. certified active cover
+
+[PDF version](sim_region_compare.pdf)
+
+![PWA partition vs. certified active validity-region cover](sim_region_compare.png)
+
+#### Unbounded mpQP benchmark
+
+[PDF version](sim_mpQP.pdf)
+
+![mpQP benchmark timing and hard-feasibility diagnostics](sim_mpQP.png)
+
+#### Control allocation benchmark
+
+[PDF version](sim_CA.pdf)
+
+![Control allocation closed-loop trajectories under deadline-limited execution](sim_CA.png)
+
+#### Adaptive cruise control benchmark
+
+[PDF version](sim_ACC.pdf)
+
+![ACC closed-loop speed, input, and safety-margin trajectories](sim_ACC.png)
 
 ---
 
@@ -179,7 +209,9 @@ open("demo_regions_.mlx")
 
 Output figure:
 
-[`sim_region_compare.pdf`](sim_region_compare.pdf)
+[PDF version](sim_region_compare.pdf)
+
+![PWA partition vs. certified active validity-region cover](sim_region_compare.png)
 
 ---
 
@@ -203,7 +235,9 @@ open("demo_mpqp_.mlx")
 
 Output figure:
 
-[`sim_mpQP.pdf`](sim_mpQP.pdf)
+[PDF version](sim_mpQP.pdf)
+
+![mpQP benchmark timing and hard-feasibility diagnostics](sim_mpQP.png)
 
 ### mpQP Headline Results
 
@@ -255,7 +289,9 @@ open("demo_ca_.mlx")
 
 Output figure:
 
-[`sim_CA.pdf`](sim_CA.pdf)
+[PDF version](sim_CA.pdf)
+
+![Control allocation closed-loop trajectories under deadline-limited execution](sim_CA.png)
 
 ### CA Headline Results
 
@@ -306,7 +342,9 @@ open("demo_acc_.mlx")
 
 Output figure:
 
-[`sim_ACC.pdf`](sim_ACC.pdf)
+[PDF version](sim_ACC.pdf)
+
+![ACC closed-loop speed, input, and safety-margin trajectories](sim_ACC.png)
 
 ### ACC Headline Results
 
