@@ -1,320 +1,395 @@
-# certnet-control-sim
+# CertNet Control Simulation Release
 
-## Overview
+This repository provides a MATLAB release package for the experiments in
 
-This repository provides the MATLAB implementation of our **certified executor / CertNet** framework for hard-constrained control with **deployable, predictable-latency execution**.
+**Provably Constraint-Satisfying Low-Latency Control via Structural Decoupling of Feasibility and Performance**
 
-The key idea is to **decouple hard-feasibility guarantees from performance learning**: the certified executor enforces hard constraint satisfaction **structurally** at deployment time, while learning is used only to recover reference-policy performance **within a certified feasible family**. This yields **(i) feasibility by construction (R1)**, **(ii) competitive performance recovery (R2)**, and **(iii) low latency (R3)**.
+The repository focuses on reproducing the reported evaluation results from released artifacts. In particular, it contains pre-synthesized certified libraries, trained controllers, baseline artifacts, compiled MEX evaluators, MATLAB live scripts, and the paper figures used for the reported experiments.
 
-This repository includes:
-- a reusable toolbox **`cnet-tb-v1`** for certified library construction and CertNet execution
-- reproducible experiments for three case studies: **mpQP benchmark**, **control allocation (CA)**, and **adaptive cruise control (ACC)**
-
-Offline, the framework synthesizes certified feasible candidate libraries and trains the learning component; online, it executes a fixed-structure algebraic pipeline without iterative optimization.
+The key idea of CertNet is to decouple hard feasibility from performance learning. Hard feasibility is enforced by a certified geometric executor, while learning is used only to select coefficients within the certified feasible family. Online execution avoids iterative optimization and projection inside CertNet; it reduces to candidate query, learned coefficient generation, and algebraic reconstruction.
 
 ---
 
-## Repository Structure
+## Repository Contents
 
 ```text
 .
-├─ cnet-tb-v1/                              # Core toolbox for certified executor / CertNet
-│  ├─ cert/                                 # Certified feasible library construction and querying
-│  │  ├─ @Cert/
-│  │  │  ├─ Cert.m
-│  │  │  ├─ api_build_.m
-│  │  │  ├─ api_check_cover_cacheAct_.m
-│  │  │  ├─ api_supplement_cacheAct_.m
-│  │  │  └─ api_vertices_.m
-│  │  ├─ cfg/
-│  │  │  └─ set_cert_default_cfg_.m
-│  │  └─ query_cache/                       # Cached query structures for fast online lookup
-│  │     ├─ cache_append_.m
-│  │     ├─ cache_init_.m
-│  │     └─ query_.m
-│  │
-│  ├─ cert-net/                             # CertNet executor and training/inference APIs
-│  │  ├─ @Certnet/
-│  │  │  ├─ Certnet.m
-│  │  │  ├─ api_build_.m
-│  │  │  ├─ api_forward_.m
-│  │  │  └─ api_train_.m
-│  │  ├─ cfg/
-│  │  │  └─ set_certnet_cfg_default_.m
-│  │  ├─ InterFcn/                          # Interface/export helpers
-│  │  │  └─ export_phi_params_.m
-│  │  ├─ cvxOpt/                            # Convex/simplex/Carathéodory utilities
-│  │  │  ├─ carath_reduce_.m
-│  │  │  ├─ convex_rep_ok_.m
-│  │  │  ├─ proj_simplex_.m
-│  │  │  └─ simplex_ls_.m
-│  │  └─ utilFcn/                           # General utility functions
-│  │     ├─ getfield_def_.m
-│  │     ├─ norm_x_.m
-│  │     ├─ simplex_cus.m
-│  │     ├─ softplus_.m
-│  │     └─ struct_merge_.m
+├─ Cert/
+│  ├─ @Cert/
+│  │  └─ Cert.m
+│  └─ api/
+│     ├─ api_build_mex_.m
+│     └─ api_cover_/
+│        ├─ cover_build_model_.m
+│        ├─ cover_filter_rows_.m
+│        ├─ cover_reduce_active_by_data_.m
+│        ├─ cover_select_add_law_.m
+│        └─ cover_solve_mip_.m
 │
-├─ Experiments/                             # Reproducible experiment scripts
-│  ├─ sim_ACC/                              # Adaptive Cruise Control (ACC) case study
-│  │  ├─ core/                              # ACC experiment functions (test/plot/report)
-│  │  │  ├─ acc_plot_.m
-│  │  │  ├─ acc_report_.m
-│  │  │  └─ acc_test_closedloop_.m
-│  │  └─ sim_ACC.mlx                        # Main ACC experiment script
-│  │
-│  ├─ sim_CA/                               # Control Allocation (CA) case study
-│  │  ├─ core/                              # CA experiment functions (test/plot/report)
-│  │  │  ├─ ca_plot_.m
-│  │  │  ├─ ca_report_.m
-│  │  │  └─ ca_test_sync_inject_.m
-│  │  └─ sim_CA.mlx                         # Main CA experiment script
-│  │
-│  ├─ sim_mpQP/                             # mpQP benchmark experiments
-│  │  ├─ core/                              # mpQP experiment functions (build/test/plot/report)
-│  │  │  ├─ mpqp_build_baseline_.m
-│  │  │  ├─ mpqp_gen_trainingData.m
-│  │  │  ├─ mpqp_make_problem_.m
-│  │  │  ├─ mpqp_plot_.m
-│  │  │  ├─ mpqp_report_problem_.m
-│  │  │  └─ mpqp_test_problem_.m
-│  │  └─ sim_mpqp.mlx                       # Main mpQP experiment script
-│  │
-│  └─ tmpFcns/                              # Shared temporary/helper functions for experiments
-│     ├─ build_pureNN_.m
-│     ├─ net_to_alg_.m
-│     └─ pure_nn_forward_alg_.m
+├─ cert_policy_mex.mexw64
+├─ nn_policy_mex.mexw64
+├─ pwa_policy_mex.mexw64
 │
-├─ Figures/                                 # Exported paper-ready figures (PDF/EPS) and README previews (PNG)
-│  ├─ sim_ACC.pdf
-│  ├─ sim_ACC.eps
-│  ├─ sim_ACC.png
-│  ├─ sim_CA.pdf
-│  ├─ sim_CA.eps
-│  ├─ sim_CA.png
-│  ├─ sim_mpQP.pdf
-│  ├─ sim_mpQP.eps
-│  └─ sim_mpQP.png
+├─ demo_Regions_release_pack.mat
+├─ demo_mpqp_release_pack.mat
+├─ demo_CA_release_pack.mat
+├─ demo_ACC_release_pack.mat
 │
-├─ ACC_vars_2026-02-20_101044.mat           # Saved ACC experiment variables/results
-├─ CA_vars_2026-02-20_104948.mat            # Saved CA experiment variables/results
-├─ MPQP_vars_2026-02-20_160236.mat          # Saved mpQP experiment results
+├─ demo_regions_.mlx
+├─ demo_mpqp_.mlx
+├─ demo_ca_.mlx
+├─ demo_acc_.mlx
+│
+├─ sim_region_compare.pdf
+├─ sim_mpQP.pdf
+├─ sim_CA.pdf
+├─ sim_ACC.pdf
+│
 ├─ LICENSE
 └─ README.md
 ```
 
-> **Notes**
-> - This repository provides the simple toolbox implementation **`cnet-tb-v1`**, which realizes the framework and experiment pipeline used in the paper.
-> - The folders `cvxOpt/` and `utilFcn/` contain supporting convex-geometry and general mathematical utilities used by the implementation. These are foundational building blocks and can be replaced by alternative implementations.
+---
+
+## Important Release Note
+
+This repository is an **evaluation/reproduction release**, not a full from-scratch training and synthesis release.
+
+The `.mat` release packs contain the already generated experiment artifacts, including the certified executor objects, trained controllers, baseline data, and evaluation data needed by the demo scripts. The released live scripts load these saved artifacts and reproduce the reported evaluation protocol, figures, and summary statistics.
+
+The full offline generation pipeline used to synthesize every certified library and train every controller from scratch is not included in this release. Therefore, the intended use of this repository is:
+
+1. load the released experiment packs;
+2. run the corresponding MATLAB live scripts;
+3. reproduce the reported figures and evaluation metrics;
+4. inspect the deployed CertNet executor and baseline behavior.
 
 ---
 
-## Quick Start for Reproducibility
+## Quick Start
 
-1. Clone or download this repository and keep the folder structure unchanged.
-2. Open MATLAB and set the current folder to the repository root.
-3. Add the repository root and all subfolders to the MATLAB path.
-4. Run the following live scripts to reproduce the reported results (figures, tables, and intermediate logs/process information):
-   - `Experiments/sim_mpQP/sim_mpqp.mlx`
-   - `Experiments/sim_CA/sim_CA.mlx`
-   - `Experiments/sim_ACC/sim_ACC.mlx`
+1. Clone or download this repository.
+2. Open MATLAB.
+3. Set the current MATLAB folder to the repository root.
+4. Add the repository to the MATLAB path:
 
-### Reproducing Figures/Reports from Saved Data (Optional)
+```matlab
+addpath(genpath(pwd));
+```
 
-To regenerate reported figures/tables without rerunning full simulations:
-1. Load the corresponding saved `.mat` file in MATLAB (e.g., `MPQP_vars_*.mat`, `CA_vars_*.mat`, `ACC_vars_*.mat`).
-2. Run the associated `report` and `plot` functions in the corresponding experiment `core/` folder.
+5. Run the live scripts:
 
-> **Notes**
-> - This repository includes saved simulation data used in the paper, containing the key parameters and baseline outputs needed for reproduction.
-> - Full simulation runs save timestamped files automatically, so the paper snapshots are not overwritten.
-> - Figures are exported in **PDF / EPS** (paper-ready) and **PNG** (GitHub README preview).
+```matlab
+open("demo_regions_.mlx")
+open("demo_mpqp_.mlx")
+open("demo_ca_.mlx")
+open("demo_acc_.mlx")
+```
+
+Each script loads its corresponding release pack:
+
+| Script | Release pack | Purpose |
+|---|---|---|
+| `demo_regions_.mlx` | `demo_Regions_release_pack.mat` | PWA partition vs. certified active validity-region cover |
+| `demo_mpqp_.mlx` | `demo_mpqp_release_pack.mat` | Unbounded mpQP benchmark evaluation |
+| `demo_ca_.mlx` | `demo_CA_release_pack.mat` | Control allocation closed-loop evaluation |
+| `demo_acc_.mlx` | `demo_ACC_release_pack.mat` | Adaptive cruise control safety-filter evaluation |
 
 ---
 
 ## Tested Environment
 
-The code has been tested with the following environment:
+The release was prepared and tested in a Windows MATLAB environment.
 
 - **OS:** Windows 11
-- **CPU:** 11th Gen Intel(R) Core(TM) i7-11850H @ 2.50GHz
-- **MATLAB:** R2025a (25.1.0.2943329)
-- **Solvers/Libraries:** MOSEK 11.0.27; YALMIP 20250626; MPT3 3.2.1
+- **MATLAB:** R2025a
+- **Solvers/Libraries used in the experiments:** MOSEK, YALMIP, MPT3
+- **Compiled evaluators:** Windows 64-bit MEX files (`*.mexw64`)
 
-MATLAB product dependencies are not enumerated here for brevity; missing products will be reported at runtime when executing the provided live scripts/models.
+The included MEX files are Windows 64-bit binaries. On non-Windows platforms, these binaries will not run directly. Recompilation or a MATLAB fallback implementation would be required for non-Windows use.
 
-> **Note:** MOSEK requires a valid license.
-
----
-
-## Features and Experimental Highlights
-
-> **Preview note:** Figures are shown as **PNG** in this README for GitHub compatibility. Paper-ready **PDF/EPS** versions are included in `Figures/`.
-
-The experiments evaluate CertNet across three representative settings:
-- **mpQP** (controlled scaling benchmark)
-- **Control Allocation (CA)** (deadline-aware closed-loop deployment)
-- **Adaptive Cruise Control (ACC)** (CLF/CBF-style safety filtering)
-
-Across all cases, the same deployment principle is tested: **feasibility is enforced structurally**, **learning recovers performance**, and the deployed executor runs through a **non-iterative fixed graph** with low latency.
+MOSEK requires a valid license if the scripts call solver-dependent baseline or projection routines.
 
 ---
 
-## 1) mpQP Benchmark (Controlled Scaling; PWA Included if Available)
+## Figures
 
-### What this benchmark shows
+The repository includes the paper-ready PDF figures:
 
-The mpQP suite provides a controlled comparison among:
-- **QP (online solver)**
-- **PWA (explicit solution, if available)**
-- **PureNN**
-- **NN+Proj**
-- **CertNet (ours)**
+| Figure file | Description |
+|---|---|
+| [`sim_region_compare.pdf`](sim_region_compare.pdf) | PWA critical-region partition vs. certified active validity-region cover |
+| [`sim_mpQP.pdf`](sim_mpQP.pdf) | mpQP benchmark timing and hard-feasibility diagnostics |
+| [`sim_CA.pdf`](sim_CA.pdf) | Control allocation closed-loop trajectories under deadline-limited execution |
+| [`sim_ACC.pdf`](sim_ACC.pdf) | ACC closed-loop speed, input, and safety-margin trajectories |
 
-Across both settings, **CertNet preserves hard feasibility (up to numerical tolerance) while significantly reducing runtime**, including tail latency.
-
-### Headline results
-
-- **Setting 1 (S1)**
-  - **CertNet:** **125.6 / 114.1 / 333.5 μs** (mean / p50 / p99)
-  - **Hard-feasibility violation rate:** **0.00%**
-  - **Mean speedup vs QP:** **13.43×**
-- **Setting 2 (S2)**
-  - **CertNet:** **196.4 / 178.3 / 465.8 μs** (mean / p50 / p99)
-  - **Hard-feasibility violation rate:** **0.00%**
-  - **Mean speedup vs QP:** **8.76×**
-
-### Offline deployability (mpQP)
-
-- **PWA availability**
-  - **S1:** available (**5899 / 1815** full/active regions)
-  - **S2:** **unavailable** under the same offline compilation budget (timeout)
-- **Certified library footprint**
-  - **S1:** `n_LFull / n_LAct = 148 / 105`
-  - **S2:** `n_LFull / n_LAct = 773 / 530`
-
-### Included artifacts
-
-- Runtime CDF / violation CDF / timing summary / runtime-error trade-off figure
-- Reported paper metrics (timing / feasibility / fidelity; see paper for full table)
-- Offline deployability scale summary (PWA availability + library sizes)
-
-<p align="center">
-  <img src="Figures/sim_mpQP.png" width="900" alt="mpQP diagnostics: runtime CDF, violation CDF, timing summary, and runtime-error trade-off"><br>
-  <b>mpQP diagnostics (S1/S2): runtime CDF, violation CDF, timing summary, and runtime-error trade-off</b>
-</p>
+GitHub does not always render PDF files inline inside `README.md`. Therefore, the figures are linked directly above. If inline preview is desired, export the PDFs to PNG and replace the links with `<img>` tags.
 
 ---
 
-## 2) Control Allocation (CA) - Deadline-Aware Closed-Loop Deployment
+## Method Summary
 
-### What this benchmark shows
+For each hard-constrained interface
 
-The CA benchmark evaluates deployment semantics, not just timing numbers.
+```math
+\mathcal U(\xi)=\{u\mid S\xi+Gu\le b\},
+```
 
-A fixed sampling deadline is enforced:
-- if a method finishes within the budget, its command is applied
-- otherwise, the controller executes a **hold action** (no update)
+CertNet constructs a certified deployable family of the form
 
-This makes runtime tails directly affect closed-loop behavior.
+```math
+u_\theta(\xi,\eta)
+=
+V(\xi)\lambda_\theta(\xi,\eta)
++
+R\rho_\theta(\xi,\eta),
+```
 
-### Headline results (CA, `Ts = 1000 μs`)
+where:
 
-- **CertNet**
-  - **217.2 / 189.4 / 680.8 μs** (mean / p50 / p99)
-  - **Timeout rate:** **0.00%**
-  - **Hard-feasibility violation rate:** **0.00%**
-- **NN+Proj**
-  - **1271.2 / 1099.4 / 3590.1 μs**
-  - **Timeout rate:** **56.60%**
-- **Opt (online solver)**
-  - **1521.9 / 1326.3 / 4142.6 μs**
-  - **Timeout rate:** **100.00%** under the same deadline semantics
-- **PureNN**
-  - very fast, but **14.80%** hard-feasibility violation rate
+- `V(xi)` is the queried matrix of certified feasible candidates;
+- `R` contains fixed recession directions satisfying `G R <= 0`;
+- `lambda_theta` lies on the simplex;
+- `rho_theta` is nonnegative.
 
-### Included artifacts
+Thus, feasibility follows structurally from the certified family, rather than from online optimization, online projection, or post-hoc repair.
 
-- Closed-loop trajectory figure under hold-on-timeout execution
-- Reported paper metrics (timing / timeout / feasibility / tracking metric; see paper for full table)
-- Optional "ideal Opt" (timing-ignored oracle) reference trajectory
-
-<p align="center">
-  <img src="Figures/sim_CA.png" width="720" alt="CA closed-loop trajectories under hold-on-timeout semantics"><br>
-  <b>Control Allocation (CA): closed-loop trajectories under deadline (hold-on-timeout) execution</b>
-</p>
+The learned proposer only controls the coefficients inside the certified feasible family. Therefore, approximation error may affect performance recovery, but not the hard-feasibility guarantee of the certified executor.
 
 ---
 
-## 3) Adaptive Cruise Control (ACC) - CLF/CBF-Style Safety Filtering
+## 1. PWA Partition vs. Feasibility-Certified Active Cover
 
-### What this benchmark shows
+The region-comparison demo illustrates the main feasibility-performance decoupling mechanism.
 
-The ACC benchmark evaluates a safety-critical CLF/CBF-style setup with hard constraints including:
-- input bounds
-- safety constraints
-- one-step state bounds
+A standard strictly convex mpQP constructs an explicit PWA optimizer by partitioning the parameter domain according to both hard constraints and objective-dependent KKT optimality conditions. In contrast, CertNet resolves only the hard-constraint-induced vertex-ray structure and learns the performance-dependent coefficient selection within the certified feasible family.
 
-Runtime is measured on representative deploy-time inputs but **not injected into the state update** (timing-only protocol), so the comparison isolates controller quality from platform-specific delay/jitter assumptions.
+In the two-dimensional illustrative example:
 
-### Headline results (ACC, `Ts = 20 ms`)
+- the explicit mpQP solution contains **52** critical regions;
+- **38** of these regions intersect the bounded plotting window;
+- CertNet compiles **71** Full-library feasibility candidates;
+- CertNet deploys only **23** active candidates.
 
-- **CertNet**
-  - **81.2 / 72.1 / 168.2 μs** (mean / p50 / p99)
-  - **Hard-feasibility violation rate:** **0.00%**
-  - Mean performance matches feasible baselines (≈ **1.65e1**)
-- **Opt (online solver):** **897.3 / 859.1 / 1425.4 μs**
-- **NN+Proj:** **800.6 / 812.7 / 1449.4 μs**
-- **PureNN:** fast, but **66.27%** hard-feasibility violation rate
+This shows that the deployed active cover can reduce the structural burden without reconstructing the full objective-induced PWA partition.
 
-### Included artifacts
+Run:
 
-- Closed-loop trajectory figure (speed / acceleration / safety margin)
-- Reported paper metrics (timing / feasibility / performance; see paper for full table)
-- Timing statistics on representative closed-loop inputs
+```matlab
+open("demo_regions_.mlx")
+```
 
-<p align="center">
-  <img src="Figures/sim_ACC.png" width="720" alt="ACC closed-loop trajectories and safety margin"><br>
-  <b>Adaptive Cruise Control (ACC): closed-loop speed, acceleration, and safety margin under timing-only evaluation</b>
-</p>
+Output figure:
+
+[`sim_region_compare.pdf`](sim_region_compare.pdf)
 
 ---
 
-## 4) At-a-Glance Summary (CA + ACC)
+## 2. Unbounded mpQP Benchmarks
 
-| Benchmark | Method | mean / p99 runtime (μs) | Feasibility | Deploy-time note |
-|---|---|---:|---|---|
-|  | Opt | 1521.9 / 4142.6 | 0.00% violation | 100.00% timeout (deadline semantics) |
-| CA | NN+Proj | 1271.2 / 3590.1 | 0.00% violation | 56.60% timeout |
-|  | **CertNet** | **217.2 / 680.8** | **0.00% violation** | **0.00% timeout** |
-|  | Opt | 897.3 / 1425.4 | 0.00% violation | timing-only evaluation |
-| ACC | NN+Proj | 800.6 / 1449.4 | 0.00% violation | timing-only evaluation |
-|  | **CertNet** | **81.2 / 168.2** | **0.00% violation** | timing-only evaluation |
+The mpQP benchmark contains two unbounded hard-constrained instances. Each instance is evaluated against a feasible QP teacher.
 
-> **Takeaway:** Across both closed-loop benchmarks, **CertNet** provides the strongest overall deployment profile: **feasibility by construction + competitive control performance + much lower runtime (including tail latency)**.
-> 
+Compared methods:
+
+- **QP:** online optimization teacher;
+- **PWA:** explicit solution when available;
+- **PureNN:** unconstrained neural policy;
+- **NN+Proj:** neural policy followed by projection when needed;
+- **CertNet:** certified executor with learned coefficient selection.
+
+Run:
+
+```matlab
+open("demo_mpqp_.mlx")
+```
+
+Output figure:
+
+[`sim_mpQP.pdf`](sim_mpQP.pdf)
+
+### mpQP Headline Results
+
+Timing is reported in microseconds. Violation rate is measured with respect to the hard-interface residual above the numerical feasibility tolerance.
+
+| Setting | Method | Mean runtime | p99 runtime | Mean speedup | Hard-feasibility violation rate | Mean `u`-MSE |
+|---|---:|---:|---:|---:|---:|---:|
+| S1 | QP | 1188.92 | 1626.65 | 1.00x | 0.00% | --- |
+| S1 | PWA | 477.95 | 612.65 | 2.49x | 0.00% | 7.81e-11 |
+| S1 | PureNN | 8.59 | 16.00 | 138.39x | 30.78% | 2.94e-2 |
+| S1 | NN+Proj | 295.27 | 1218.35 | 4.03x | 0.00% | 2.82e-2 |
+| S1 | **CertNet** | **33.02** | **66.20** | **36.01x** | **0.00%** | **2.50e-2** |
+| S2 | QP | 1247.93 | 1612.85 | 1.00x | 0.00% | --- |
+| S2 | PureNN | 9.87 | 17.15 | 126.46x | 50.82% | 4.16e-2 |
+| S2 | NN+Proj | 477.67 | 1165.95 | 2.61x | 0.00% | 3.90e-2 |
+| S2 | **CertNet** | **46.41** | **85.20** | **26.89x** | **0.00%** | **3.34e-2** |
+
+For NN+Proj, the projection-use rates are **30.84%** in S1 and **50.96%** in S2. This explains the increased mean and tail runtime compared with the raw neural predictor.
+
+### Offline Representation Scale
+
+| Setting | Dimensions `(n_u,n_xi,n_eta)` | Hard/soft inequalities `(m_H,m_S)` | PWA regions | Active/Full library |
+|---|---:|---:|---:|---:|
+| S1 | `(3,2,1)` | `(18,30)` | 12091 | 75 / 236 |
+| S2 | `(3,6,2)` | `(33,40)` | timeout | 436 / 1935 |
+
+S1 shows that the certified active library can be much smaller than the explicit objective-induced PWA partition. S2 shows that explicit PWA compilation may become unavailable under the same practical offline budget, while the certified active library remains deployable.
+
 ---
 
-## Notes on Reported Timing Metrics
+## 3. Control Allocation Benchmark
 
-- Timings are reported after warm-up (steady-state execution)
-- We report **mean / p50 / p99** to capture both central tendency and tail behavior
-- **p99** is emphasized as the main tail metric (more stable than sample max under platform/timer jitter)
+The control allocation benchmark evaluates deadline-aware closed-loop deployment.
+
+At each step, the controller must finish within the sampling budget. If a method exceeds the deadline, the system applies a zero-increment hold action. Therefore, runtime tails directly affect the closed-loop trajectory.
+
+Compared methods:
+
+- **Opt:** online optimization teacher;
+- **PureNN:** unconstrained neural policy;
+- **NN+Proj:** neural policy with projection repair;
+- **CertNet:** certified executor.
+
+Run:
+
+```matlab
+open("demo_ca_.mlx")
+```
+
+Output figure:
+
+[`sim_CA.pdf`](sim_CA.pdf)
+
+### CA Headline Results
+
+Sampling deadline:
+
+```text
+T_s = 1000 microseconds
+```
+
+| Method | Mean runtime | p99 runtime | Mean speedup | Hard-feasibility violation rate | Deadline miss rate | `w`RMSE |
+|---|---:|---:|---:|---:|---:|---:|
+| Opt | 1006.3 | 2027.4 | 1.00x | 0.00% | 26.00% | 2.098e-1 |
+| PureNN | 10.1 | 32.2 | 99.97x | 48.60% | 0.00% | 3.097e-1 |
+| NN+Proj | 387.2 | 1885.3 | 2.60x | 0.00% | 10.40% | 3.222e-1 |
+| **CertNet** | **63.3** | **185.8** | **15.89x** | **0.00%** | **0.00%** | **4.231e-2** |
+
+The CA benchmark shows three different deployment behaviors. Opt provides the teacher labels but can miss deadlines. PureNN is fast but violates the hard interface. NN+Proj restores feasibility but reintroduces expensive projection and tail latency. CertNet avoids both hard-interface violations and deadline misses while achieving the best deployed tracking metric in this experiment.
+
+The released CA artifacts use:
+
+```text
+N_train = 20000
+N_test  = 500
+n_LFull = 4096
+n_LAct  = 353
+```
+
+---
+
+## 4. Adaptive Cruise Control Benchmark
+
+The ACC benchmark evaluates CLF/CBF-style safety-filter recovery.
+
+The hard interface includes input bounds, safety constraints, and one-step state bounds. Runtime is measured for deployment comparison, but it is not injected into the state update. Thus, the rollout evaluates controller quality and safety, while the timing results quantify computational cost.
+
+Compared methods:
+
+- **Opt:** online CLF/CBF-style optimization teacher;
+- **PureNN:** unconstrained neural policy;
+- **NN+Proj:** neural policy with projection repair;
+- **CertNet:** certified executor.
+
+Run:
+
+```matlab
+open("demo_acc_.mlx")
+```
+
+Output figure:
+
+[`sim_ACC.pdf`](sim_ACC.pdf)
+
+### ACC Headline Results
+
+| Method | Mean runtime | p99 runtime | Mean speedup | Hard-feasibility violation rate | Rollout status | Cost |
+|---|---:|---:|---:|---:|---:|---:|
+| Opt | 805.0 | 1286.0 | 1.00x | 0.00% | safe | 1.648e1 |
+| PureNN | 8.9 | 21.2 | 90.29x | 70.00% | unsafe | N/A |
+| NN+Proj | 173.8 | 1054.4 | 4.63x | 0.07% | stop 568/1500 | N/A |
+| **CertNet** | **24.7** | **56.3** | **32.60x** | **0.00%** | **safe** | **1.651e1** |
+
+PureNN is fast but unsafe in closed-loop rollout. NN+Proj repairs many infeasible neural outputs, but the projection routine becomes a runtime and robustness bottleneck and stops at step `568/1500`. CertNet follows Opt-like safe behavior while avoiding online projection and substantially reducing both mean and tail runtime.
+
+The released ACC artifacts use:
+
+```text
+N_train = 20000
+N_test  = 1500
+n_LFull = 5
+n_LAct  = 4
+```
+
+---
+
+## At-a-Glance Summary
+
+| Benchmark | CertNet mean runtime | CertNet p99 runtime | Speedup vs. optimization | Hard-feasibility violation rate | Main deployment outcome |
+|---|---:|---:|---:|---:|---|
+| mpQP S1 | 33.02 us | 66.20 us | 36.01x vs QP | 0.00% | Fast certified evaluation |
+| mpQP S2 | 46.41 us | 85.20 us | 26.89x vs QP | 0.00% | PWA compilation times out, CertNet remains deployable |
+| CA | 63.3 us | 185.8 us | 15.89x vs Opt | 0.00% | Zero deadline misses under `T_s=1000 us` |
+| ACC | 24.7 us | 56.3 us | 32.60x vs Opt | 0.00% | Safe finite rollout with Opt-like behavior |
+
+---
+
+## Notes on Timing and Feasibility Metrics
+
+- Timings exclude one-time setup overhead.
+- Timing statistics are steady-state evaluation times.
+- Mean and p99 are reported to reflect both average runtime and tail behavior.
+- Hard-feasibility violation rate is computed using the numerical feasibility threshold used in the experiments.
+- A reported `0.00%` violation rate means zero observed violations above the prescribed numerical tolerance in the evaluated samples or rollout.
+- For NN+Proj, the projection-use rate is reported separately because projection calls explain much of its runtime tail.
+
+---
+
+## Reproducibility Scope
+
+This repository supports reproduction of the released evaluation artifacts:
+
+- loading trained/released controllers;
+- evaluating CertNet and baselines;
+- reproducing timing, feasibility, and closed-loop metrics;
+- regenerating the provided paper figures.
+
+This repository does not claim to provide a complete from-scratch rebuild of every controller, library, and training run from raw random seeds. The included release packs are the intended reproduction interface.
 
 ---
 
 ## Citation
 
-If you use this repository in your research, please cite the corresponding paper (citation entry to be added upon publication).
+If you use this repository in your research, please cite the corresponding paper:
+
+```bibtex
+@article{liao2026certnet,
+  title   = {Provably Constraint-Satisfying Low-Latency Control via Structural Decoupling of Feasibility and Performance},
+  author  = {Liao, Jiaping and Xiang, Weiming},
+  journal = {Manuscript},
+  year    = {2026}
+}
+```
+
+Please update the BibTeX entry after publication.
 
 ---
 
 ## License
 
-This project is released under the license included in this repository (see `LICENSE`).
+This project is released under the license included in this repository. See [`LICENSE`](LICENSE).
 
 ---
 
 ## Contact
 
-For questions or issues, please open a GitHub issue or contact the authors.
+For questions, please open a GitHub issue or contact the authors.
