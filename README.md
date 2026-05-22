@@ -6,16 +6,30 @@ This repository provides a MATLAB evaluation package for the accompanying manusc
 
 The manuscript is currently under review. This repository is provided to support reproducibility of the reported experiments.
 
-## What This Release Demonstrates
+## Key Message
 
-CertNet targets the deployment trade-off among **hard feasibility**, **performance recovery**, and **online latency**:
+CertNet is designed for hard-constrained real-time control problems where **feasibility**, **performance**, and **online latency** must be considered together.
 
-- **Hard feasibility by construction:** the deployed policy is restricted to a certified feasible family, so hard constraints are protected by geometry rather than by online correction.
-- **Performance recovery by learning:** the neural proposer learns coefficient selection inside the certified family, instead of directly outputting an unconstrained action.
-- **Low-latency deployment:** online CertNet execution avoids iterative optimization and online projection; it uses candidate query, score/simplex mapping, and algebraic reconstruction.
-- **Improved deployment trade-off:** PureNN is fast but can violate hard constraints; NN+Proj restores feasibility but introduces projection overhead and tail latency; online optimization is reliable but slower. CertNet is designed to preserve feasibility while retaining low and predictable runtime.
+The experiments compare CertNet with representative controller types:
 
-This repository contains the released experiment artifacts used for evaluation: certified executor objects, trained controllers, baseline artifacts, compiled MEX evaluators, MATLAB live scripts, and PDF/PNG figures associated with the reported experiments.
+- **Online optimization (QP/Opt):** reliable and high-quality, but slower and sensitive to runtime tails.
+- **Explicit PWA control:** fast when available, but can require a large objective-induced partition and may become impractical to compile.
+- **PureNN:** very fast, but does not enforce hard constraints.
+- **NN+Proj:** restores feasibility through projection, but reintroduces online correction cost and tail latency.
+- **CertNet:** preserves hard feasibility through a certified executor while keeping online evaluation non-iterative and low-latency.
+
+Across the released benchmarks, CertNet achieves **zero observed hard-constraint violation above the numerical tolerance**, competitive tracking or teacher-matching performance, and substantial speedups over online optimization.
+
+---
+
+## Main Results at a Glance
+
+| Benchmark | CertNet mean runtime | CertNet p99 runtime | Speedup vs. optimization | Hard-feasibility violation rate | Main observation |
+|---|---:|---:|---:|---:|---|
+| mpQP S1 | 33.02 us | 66.20 us | 36.01x vs QP | 0.00% | Feasible and faster than QP/PWA in this implementation |
+| mpQP S2 | 46.41 us | 85.20 us | 26.89x vs QP | 0.00% | PWA compilation times out; CertNet remains deployable |
+| CA | 63.3 us | 185.8 us | 15.89x vs Opt | 0.00% | Zero deadline misses under `T_s = 1000 us` |
+| ACC | 24.7 us | 56.3 us | 32.60x vs Opt | 0.00% | Safe rollout with Opt-like behavior |
 
 ---
 
@@ -66,16 +80,16 @@ This repository contains the released experiment artifacts used for evaluation: 
 
 ## Release Organization
 
-This repository is organized around the evaluation stage of the study.
+This repository is organized as a reproducible evaluation release.
 
-The `.mat` release packs store the generated experiment artifacts required by the demo scripts, including certified executor data, trained controllers, baseline objects, and evaluation data. The MATLAB live scripts load these release packs and reproduce the reported testing protocol, figures, timing summaries, feasibility checks, and closed-loop evaluation results.
+The `.mat` release packs contain the generated artifacts required by the demo scripts, including certified executor data, trained controllers, baseline objects, and evaluation data. The MATLAB live scripts load these release packs and reproduce the reported testing protocols, figures, timing summaries, feasibility checks, and closed-loop evaluation results.
 
-The intended workflow is:
+The intended workflow is simple:
 
 1. load the released experiment pack;
 2. run the corresponding MATLAB live script;
-3. reproduce the reported evaluation metrics and figures;
-4. inspect the deployed CertNet executor and baseline behavior.
+3. reproduce the reported metrics and figures;
+4. inspect the deployed CertNet and baseline behavior.
 
 ---
 
@@ -90,7 +104,7 @@ The intended workflow is:
 addpath(genpath(pwd));
 ```
 
-5. Run the live scripts:
+5. Open and run the live scripts:
 
 ```matlab
 open("demo_regions_.mlx")
@@ -119,7 +133,7 @@ The release was prepared and tested in a Windows MATLAB environment.
 - **Solvers/Libraries used in the experiments:** MOSEK, YALMIP, MPT3
 - **Compiled evaluators:** Windows 64-bit MEX files (`*.mexw64`)
 
-The included MEX files are Windows 64-bit binaries. On non-Windows platforms, these binaries will not run directly without recompilation or a MATLAB fallback implementation.
+The included MEX files are Windows 64-bit binaries. On non-Windows platforms, these binaries require recompilation or a MATLAB fallback implementation.
 
 MOSEK requires a valid license if the scripts call solver-dependent baseline or projection routines.
 
@@ -136,49 +150,33 @@ The repository includes paper-ready PDF figures and PNG previews for GitHub visu
 | [`sim_CA.pdf`](sim_CA.pdf) | [`sim_CA.png`](sim_CA.png) | Control allocation closed-loop trajectories under deadline-limited execution |
 | [`sim_ACC.pdf`](sim_ACC.pdf) | [`sim_ACC.png`](sim_ACC.png) | ACC closed-loop speed, input, and safety-margin trajectories |
 
-The PNG files are shown once in the corresponding experiment sections below. The PDF files are retained as high-quality paper-ready versions.
+The PNG files are displayed once in the corresponding experiment sections below. The PDF files are retained as high-quality paper-ready versions.
 
 ---
 
-## Method Summary
+## Method-Level Interpretation
 
-For each hard-constrained interface
+CertNet separates two roles that are usually entangled in hard-constrained controllers:
 
-```math
-\mathcal U(\xi)=\{u\mid S\xi+Gu\le b\},
-```
+- **Feasibility protection:** handled by the certified executor and the precomputed feasible family.
+- **Performance recovery:** handled by learning inside that feasible family.
 
-CertNet constructs a certified deployable family of the form
+This design is different from directly learning the control action and then repairing it afterward. As a result, learning errors may affect performance quality, but the hard-feasibility protection is inherited from the certified executor structure.
 
-```math
-u_\theta(\xi,\eta)
-=
-V(\xi)\lambda_\theta(\xi,\eta)
-+
-R\rho_\theta(\xi,\eta),
-```
-
-where:
-
-- `V(xi)` is the queried matrix of certified feasible candidates;
-- `R` contains fixed recession directions satisfying `G R <= 0`;
-- `lambda_theta` lies on the simplex;
-- `rho_theta` is nonnegative.
-
-Thus, feasibility follows structurally from the certified family. Learning affects performance recovery through coefficient selection, but it does not remove the hard-feasibility protection provided by the certified executor.
+The experiments below are organized to show this distinction across different settings: mpQP benchmarks, deadline-aware control allocation, and ACC safety filtering.
 
 ---
 
 ## 1. PWA Partition vs. Feasibility-Certified Active Cover
 
-The region-comparison demo illustrates the central feasibility-performance decoupling mechanism.
+This demo illustrates why CertNet does not need to reconstruct the full explicit optimizer partition.
 
-A standard strictly convex mpQP constructs an explicit PWA optimizer by partitioning the parameter domain according to both hard constraints and objective-dependent KKT optimality conditions. In contrast, CertNet resolves only the hard-constraint-induced vertex-ray structure and learns the performance-dependent coefficient selection within the certified feasible family.
+For a strictly convex mpQP, an explicit PWA solution partitions the parameter space according to both the hard constraints and the objective-dependent KKT optimality conditions. CertNet instead focuses on the hard-constraint-induced feasible structure and uses learning to recover performance within the certified family.
 
-The figure compares these two representations on a two-dimensional unbounded hard-constrained example, shown on a bounded plotting window. The left panel shows the explicit mpQP critical-region partition. The right panel shows the certified active validity-region cover generated by the active library, where the color indicates the number of queried active candidates.
+The figure compares these two representations on a two-dimensional unbounded hard-constrained example, shown on a bounded plotting window. The left panel shows the explicit mpQP critical-region partition. The right panel shows the certified active validity-region cover generated by the active library, where color indicates the number of queried active candidates.
 
 <p align="center">
-  <img src="sim_region_compare.png" width="620" alt="PWA partition vs. certified active validity-region cover"><br>
+  <img src="sim_region_compare.png" width="600" alt="PWA partition vs. certified active validity-region cover"><br>
   <b>PWA partition vs. certified active validity-region cover.</b>
 </p>
 
@@ -189,9 +187,9 @@ In this example:
 - the explicit mpQP solution contains **52** critical regions;
 - **38** of these regions intersect the bounded plotting window;
 - CertNet compiles **71** Full-library feasibility candidates;
-- CertNet deploys only **23** active candidates.
+- CertNet deploys **23** active candidates.
 
-This comparison highlights the intended distinction: explicit mpQP represents the objective-induced optimizer partition, whereas CertNet represents a feasibility-certified active cover and leaves performance recovery to coefficient selection inside the certified family. Therefore, the deployed active cover can reduce the structural burden without reconstructing the full objective-induced PWA partition.
+This comparison highlights the intended structural advantage: explicit mpQP represents the objective-induced optimizer partition, whereas CertNet deploys a feasibility-certified active cover and learns the performance-dependent selection inside that cover.
 
 Run:
 
@@ -203,7 +201,7 @@ open("demo_regions_.mlx")
 
 ## 2. Unbounded mpQP Benchmarks
 
-The mpQP benchmark contains two unbounded hard-constrained instances. Each instance is evaluated against a feasible QP teacher.
+The mpQP benchmark evaluates the latency-feasibility-performance trade-off on two unbounded hard-constrained instances.
 
 Compared methods:
 
@@ -211,12 +209,12 @@ Compared methods:
 - **PWA:** explicit solution when available;
 - **PureNN:** unconstrained neural policy;
 - **NN+Proj:** neural policy followed by projection when needed;
-- **CertNet:** certified executor with learned coefficient selection.
+- **CertNet:** certified executor with learned selection.
 
-The figure reports the latency-feasibility behavior of all methods. The timing panels summarize mean, median, and p99 runtime, while the violation-CDF panels show the hard-constraint residual distribution relative to the numerical feasibility tolerance. This directly evaluates whether low runtime is obtained without losing hard-interface feasibility.
+The figure summarizes runtime and hard-feasibility behavior. The timing panels show mean, median, and p99 runtime. The violation-CDF panels show the hard-constraint residual distribution relative to the numerical feasibility tolerance.
 
 <p align="center">
-  <img src="sim_mpQP.png" width="760" alt="mpQP benchmark timing and hard-feasibility diagnostics"><br>
+  <img src="sim_mpQP.png" width="560" alt="mpQP benchmark timing and hard-feasibility diagnostics"><br>
   <b>mpQP benchmark timing and hard-feasibility diagnostics.</b>
 </p>
 
@@ -228,34 +226,30 @@ Run:
 open("demo_mpqp_.mlx")
 ```
 
-### mpQP Headline Results
+### mpQP Results
 
-Timing is reported in microseconds. Violation rate is measured with respect to the hard-interface residual above the numerical feasibility tolerance.
-
-| Setting | Method | Mean runtime | p99 runtime | Mean speedup | Hard-feasibility violation rate | Mean `u`-MSE |
+| Setting | Method | Mean runtime | p99 runtime | Speedup | Violation rate | Mean `u`-MSE |
 |---|---:|---:|---:|---:|---:|---:|
-| S1 | QP | 1188.92 | 1626.65 | 1.00x | 0.00% | --- |
-| S1 | PWA | 477.95 | 612.65 | 2.49x | 0.00% | 7.81e-11 |
-| S1 | PureNN | 8.59 | 16.00 | 138.39x | 30.78% | 2.94e-2 |
-| S1 | NN+Proj | 295.27 | 1218.35 | 4.03x | 0.00% | 2.82e-2 |
-| S1 | **CertNet** | **33.02** | **66.20** | **36.01x** | **0.00%** | **2.50e-2** |
-| S2 | QP | 1247.93 | 1612.85 | 1.00x | 0.00% | --- |
-| S2 | PureNN | 9.87 | 17.15 | 126.46x | 50.82% | 4.16e-2 |
-| S2 | NN+Proj | 477.67 | 1165.95 | 2.61x | 0.00% | 3.90e-2 |
-| S2 | **CertNet** | **46.41** | **85.20** | **26.89x** | **0.00%** | **3.34e-2** |
+| S1 | QP | 1188.92 us | 1626.65 us | 1.00x | 0.00% | --- |
+| S1 | PWA | 477.95 us | 612.65 us | 2.49x | 0.00% | 7.81e-11 |
+| S1 | PureNN | 8.59 us | 16.00 us | 138.39x | 30.78% | 2.94e-2 |
+| S1 | NN+Proj | 295.27 us | 1218.35 us | 4.03x | 0.00% | 2.82e-2 |
+| S1 | **CertNet** | **33.02 us** | **66.20 us** | **36.01x** | **0.00%** | **2.50e-2** |
+| S2 | QP | 1247.93 us | 1612.85 us | 1.00x | 0.00% | --- |
+| S2 | PureNN | 9.87 us | 17.15 us | 126.46x | 50.82% | 4.16e-2 |
+| S2 | NN+Proj | 477.67 us | 1165.95 us | 2.61x | 0.00% | 3.90e-2 |
+| S2 | **CertNet** | **46.41 us** | **85.20 us** | **26.89x** | **0.00%** | **3.34e-2** |
 
 For NN+Proj, the projection-use rates are **30.84%** in S1 and **50.96%** in S2. This explains the increased mean and tail runtime compared with the raw neural predictor.
 
-### Offline Representation Scale
+### mpQP Offline Representation
 
 | Setting | Dimensions `(n_u,n_xi,n_eta)` | Hard/soft inequalities `(m_H,m_S)` | PWA regions | Active/Full library |
 |---|---:|---:|---:|---:|
 | S1 | `(3,2,1)` | `(18,30)` | 12091 | 75 / 236 |
 | S2 | `(3,6,2)` | `(33,40)` | timeout | 436 / 1935 |
 
-S1 shows that the certified active library can be much smaller than the explicit objective-induced PWA partition. S2 shows that explicit PWA compilation may become unavailable under the same practical offline budget, while the certified active library remains deployable.
-
-The mpQP results show the separation among the methods. PureNN is fast but not reliable under hard constraints. NN+Proj restores feasibility through online projection, but this repair increases runtime, especially in the tail. CertNet preserves hard-interface feasibility while avoiding both online QP solving and online projection.
+The mpQP results show the main trade-off clearly. PureNN is fastest but violates hard constraints. NN+Proj restores feasibility but adds projection cost and tail latency. QP is reliable but slower. CertNet preserves hard feasibility while avoiding both online QP solving and online projection.
 
 ---
 
@@ -272,10 +266,10 @@ Compared methods:
 - **NN+Proj:** neural policy with projection repair;
 - **CertNet:** certified executor.
 
-The figure shows the closed-loop behavior under this deadline-enforced execution rule. It is designed to test not only raw controller quality, but also whether runtime tails and deadline misses propagate into closed-loop degradation.
+The figure shows the closed-loop behavior under this deadline-enforced execution rule. It tests whether runtime tails and deadline misses propagate into trajectory-level degradation.
 
 <p align="center">
-  <img src="sim_CA.png" width="700" alt="Control allocation closed-loop trajectories under deadline-limited execution"><br>
+  <img src="sim_CA.png" width="650" alt="Control allocation closed-loop trajectories under deadline-limited execution"><br>
   <b>Control allocation closed-loop trajectories under deadline-limited execution.</b>
 </p>
 
@@ -287,7 +281,7 @@ Run:
 open("demo_ca_.mlx")
 ```
 
-### CA Headline Results
+### CA Results
 
 Sampling deadline:
 
@@ -295,16 +289,16 @@ Sampling deadline:
 T_s = 1000 microseconds
 ```
 
-| Method | Mean runtime | p99 runtime | Mean speedup | Hard-feasibility violation rate | Deadline miss rate | `w`RMSE |
+| Method | Mean runtime | p99 runtime | Speedup | Violation rate | Deadline miss rate | `w`RMSE |
 |---|---:|---:|---:|---:|---:|---:|
-| Opt | 1006.3 | 2027.4 | 1.00x | 0.00% | 26.00% | 2.098e-1 |
-| PureNN | 10.1 | 32.2 | 99.97x | 48.60% | 0.00% | 3.097e-1 |
-| NN+Proj | 387.2 | 1885.3 | 2.60x | 0.00% | 10.40% | 3.222e-1 |
-| **CertNet** | **63.3** | **185.8** | **15.89x** | **0.00%** | **0.00%** | **4.231e-2** |
+| Opt | 1006.3 us | 2027.4 us | 1.00x | 0.00% | 26.00% | 2.098e-1 |
+| PureNN | 10.1 us | 32.2 us | 99.97x | 48.60% | 0.00% | 3.097e-1 |
+| NN+Proj | 387.2 us | 1885.3 us | 2.60x | 0.00% | 10.40% | 3.222e-1 |
+| **CertNet** | **63.3 us** | **185.8 us** | **15.89x** | **0.00%** | **0.00%** | **4.231e-2** |
 
-The CA benchmark shows three different deployment behaviors. Opt provides the teacher labels but can miss deadlines. PureNN is fast but violates the hard interface. NN+Proj restores feasibility but reintroduces expensive projection and tail latency. CertNet avoids both hard-interface violations and deadline misses while achieving the best deployed tracking metric in this experiment.
+The CA benchmark shows that the runtime profile matters for closed-loop deployment. Opt can miss deadlines. PureNN is fast but violates the hard interface. NN+Proj restores feasibility but suffers from projection overhead. CertNet avoids both hard-interface violations and deadline misses in this experiment.
 
-The released CA artifacts use:
+Released CA artifacts:
 
 ```text
 N_train = 20000
@@ -319,7 +313,7 @@ n_LAct  = 353
 
 The ACC benchmark evaluates CLF/CBF-style safety-filter recovery.
 
-The hard interface includes input bounds, safety constraints, and one-step state bounds. Runtime is measured for deployment comparison, but it is not injected into the state update. Thus, the rollout evaluates controller quality and safety, while the timing results quantify computational cost.
+The hard interface includes input bounds, safety constraints, and one-step state bounds. Runtime is measured for deployment comparison, while the rollout evaluates safety and controller quality.
 
 Compared methods:
 
@@ -328,10 +322,10 @@ Compared methods:
 - **NN+Proj:** neural policy with projection repair;
 - **CertNet:** certified executor.
 
-The figure shows closed-loop speed, input, and safety-margin behavior. This benchmark tests whether the certified executor can recover the behavior of a safety-filtering teacher while keeping the online path non-iterative and low-latency.
+The figure shows closed-loop speed, input, and safety-margin behavior. This benchmark tests whether the certified executor can recover the behavior of a safety-filtering teacher while keeping the online path low-latency.
 
 <p align="center">
-  <img src="sim_ACC.png" width="700" alt="ACC closed-loop speed, input, and safety-margin trajectories"><br>
+  <img src="sim_ACC.png" width="650" alt="ACC closed-loop speed, input, and safety-margin trajectories"><br>
   <b>ACC closed-loop speed, input, and safety-margin trajectories.</b>
 </p>
 
@@ -343,18 +337,18 @@ Run:
 open("demo_acc_.mlx")
 ```
 
-### ACC Headline Results
+### ACC Results
 
-| Method | Mean runtime | p99 runtime | Mean speedup | Hard-feasibility violation rate | Rollout status | Cost |
+| Method | Mean runtime | p99 runtime | Speedup | Violation rate | Rollout status | Cost |
 |---|---:|---:|---:|---:|---:|---:|
-| Opt | 805.0 | 1286.0 | 1.00x | 0.00% | safe | 1.648e1 |
-| PureNN | 8.9 | 21.2 | 90.29x | 70.00% | unsafe | N/A |
-| NN+Proj | 173.8 | 1054.4 | 4.63x | 0.07% | stop 568/1500 | N/A |
-| **CertNet** | **24.7** | **56.3** | **32.60x** | **0.00%** | **safe** | **1.651e1** |
+| Opt | 805.0 us | 1286.0 us | 1.00x | 0.00% | safe | 1.648e1 |
+| PureNN | 8.9 us | 21.2 us | 90.29x | 70.00% | unsafe | N/A |
+| NN+Proj | 173.8 us | 1054.4 us | 4.63x | 0.07% | stop 568/1500 | N/A |
+| **CertNet** | **24.7 us** | **56.3 us** | **32.60x** | **0.00%** | **safe** | **1.651e1** |
 
-PureNN is fast but unsafe in closed-loop rollout. NN+Proj repairs many infeasible neural outputs, but the projection routine becomes a runtime and robustness bottleneck and stops at step `568/1500`. CertNet follows Opt-like safe behavior while avoiding online projection and substantially reducing both mean and tail runtime.
+PureNN is fast but unsafe in closed-loop rollout. NN+Proj repairs many infeasible neural outputs, but projection becomes a runtime and robustness bottleneck. CertNet follows Opt-like safe behavior while substantially reducing both mean and tail runtime.
 
-The released ACC artifacts use:
+Released ACC artifacts:
 
 ```text
 N_train = 20000
@@ -365,25 +359,14 @@ n_LAct  = 4
 
 ---
 
-## At-a-Glance Summary
-
-| Benchmark | CertNet mean runtime | CertNet p99 runtime | Speedup vs. optimization | Hard-feasibility violation rate | Main deployment outcome |
-|---|---:|---:|---:|---:|---|
-| mpQP S1 | 33.02 us | 66.20 us | 36.01x vs QP | 0.00% | Fast certified evaluation |
-| mpQP S2 | 46.41 us | 85.20 us | 26.89x vs QP | 0.00% | PWA compilation times out, CertNet remains deployable |
-| CA | 63.3 us | 185.8 us | 15.89x vs Opt | 0.00% | Zero deadline misses under `T_s=1000 us` |
-| ACC | 24.7 us | 56.3 us | 32.60x vs Opt | 0.00% | Safe finite rollout with Opt-like behavior |
-
----
-
-## Notes on Timing and Feasibility Metrics
+## Notes on Metrics
 
 - Timings exclude one-time setup overhead.
 - Timing statistics are steady-state evaluation times.
-- Mean and p99 are reported to reflect both average runtime and tail behavior.
-- Hard-feasibility violation rate is computed using the numerical feasibility threshold used in the experiments.
-- A reported `0.00%` violation rate means zero observed violations above the prescribed numerical tolerance in the evaluated samples or rollout.
-- For NN+Proj, the projection-use rate is reported separately because projection calls explain much of its runtime tail.
+- Mean and p99 are reported to show both average runtime and tail behavior.
+- Violation rate is computed using the numerical feasibility threshold used in the experiments.
+- A reported `0.00%` violation rate means zero observed violations above the prescribed numerical tolerance.
+- For NN+Proj, projection-use rate is reported because projection calls explain much of its runtime tail.
 
 ---
 
