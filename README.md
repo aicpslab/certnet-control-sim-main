@@ -18,7 +18,7 @@ The experiments compare CertNet with representative controller types:
 - **NN+Proj:** restores feasibility through projection, but reintroduces online correction cost and tail latency.
 - **CertNet:** preserves hard feasibility through a certified executor while keeping online evaluation non-iterative and low-latency.
 
-Across the released benchmarks, CertNet achieves **zero observed hard-constraint violation above the numerical tolerance**, competitive tracking or teacher-matching performance, and substantial speedups over online optimization.
+Across the released benchmarks, CertNet achieves **zero observed hard-constraint violation rate above the numerical tolerance**, competitive tracking or teacher-matching performance, and substantial speedups over online optimization.
 
 ---
 
