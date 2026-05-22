@@ -41,13 +41,7 @@ Across the released benchmarks, CertNet achieves **zero observed hard-constraint
 │  ├─ @Cert/
 │  │  └─ Cert.m
 │  └─ api/
-│     ├─ api_build_mex_.m
-│     └─ api_cover_/
-│        ├─ cover_build_model_.m
-│        ├─ cover_filter_rows_.m
-│        ├─ cover_reduce_active_by_data_.m
-│        ├─ cover_select_add_law_.m
-│        └─ cover_solve_mip_.m
+│     └─ api_build_mex_.m
 │
 ├─ cert_policy_mex.mexw64
 ├─ nn_policy_mex.mexw64
