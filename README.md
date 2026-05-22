@@ -123,8 +123,6 @@ The repository includes the paper-ready PDF figures:
 | [`sim_CA.pdf`](sim_CA.pdf) | Control allocation closed-loop trajectories under deadline-limited execution |
 | [`sim_ACC.pdf`](sim_ACC.pdf) | ACC closed-loop speed, input, and safety-margin trajectories |
 
-GitHub does not always render PDF files inline inside `README.md`. Therefore, the figures are linked directly above. If inline preview is desired, export the PDFs to PNG and replace the links with `<img>` tags.
-
 ---
 
 ## Method Summary
