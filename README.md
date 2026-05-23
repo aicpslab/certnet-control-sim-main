@@ -2,7 +2,7 @@
 
 This repository provides a MATLAB evaluation package for the accompanying manuscript:
 
-**Provably Constraint-Satisfying Low-Latency Control via Structural Decoupling of Feasibility and Performance**
+**Provably Constraint-Feasible Low-Latency Control via Feasibility–Performance Decoupling**
 
 The manuscript is currently under review. This repository is provided to support reproducibility of the reported experiments.
 
